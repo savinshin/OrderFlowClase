@@ -14,4 +14,6 @@ builder.AddProject<Projects.OrderFlowClase_API_Identity>("orderflowclase-api-ide
     .WaitFor(db)
     .WithReference(db);
 
+builder.AddProject<Projects.OrderFlowClase_ApiGateway>("orderflowclase-apigateway");
+
 builder.Build().Run();
