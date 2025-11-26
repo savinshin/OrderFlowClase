@@ -1,4 +1,5 @@
 ﻿using Asp.Versioning;
+using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -26,8 +27,19 @@ namespace OrderFlowClase.API.Identity.Controllers
 
 
         [HttpPatch("{userId}/change-password")]
-        public async Task<ActionResult<PasswordChangeResponse>> ChangePassword(string userId, [FromBody] PasswordChangeRequest request)
+        public async Task<ActionResult<PasswordChangeResponse>> ChangePassword(
+            string userId,
+            [FromBody] PasswordChangeRequest request,
+            [FromServices] IValidator<PasswordChangeRequest> validator
+            )
         {
+            var validation = await validator.ValidateAsync(request);
+
+            if (!validation.IsValid)
+            {
+                return BadRequest(validation.Errors);
+            }
+
             var result = await _userService.ChangePasswordAsync(userId, request.CurrentPassword, request.NewPassword);
 
             var response = new PasswordChangeResponse
@@ -37,7 +49,7 @@ namespace OrderFlowClase.API.Identity.Controllers
 
             if (!result)
             {
-                return BadRequest(response);    
+                return BadRequest(response);
             }
 
             return Ok(response);

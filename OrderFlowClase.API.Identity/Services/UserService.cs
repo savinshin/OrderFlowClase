@@ -1,5 +1,8 @@
-﻿using Microsoft.AspNetCore.Identity;
+﻿using FluentValidation;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
+using OrderFlowClase.API.Identity.Validations.Users;
 
 namespace OrderFlowClase.API.Identity.Services
 {
@@ -7,9 +10,12 @@ namespace OrderFlowClase.API.Identity.Services
     {
 
         private UserManager<IdentityUser> _userManager;
-        private ILogger<UserService> _logger;
+        private readonly ILogger<UserService> _logger;
 
-        public UserService(UserManager<IdentityUser> userManager, ILogger<UserService> logger)
+        public UserService(
+            UserManager<IdentityUser> userManager, 
+            ILogger<UserService> logger
+            )
         {
             _userManager = userManager;
             _logger = logger;
@@ -17,6 +23,7 @@ namespace OrderFlowClase.API.Identity.Services
 
         public async Task<bool> ChangePasswordAsync(string userId, string currentPassword, string newPassword)
         {
+
             var user = await _userManager.FindByIdAsync(userId);
 
             if (user == null)
