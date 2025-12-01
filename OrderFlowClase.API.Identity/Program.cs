@@ -2,11 +2,13 @@ using Asp.Versioning;
 using FluentValidation;
 using MassTransit;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using OrderFlowClase.API.Identity;
+using OrderFlowClase.API.Identity.Controllers;
 using OrderFlowClase.API.Identity.Services;
 using Scalar.AspNetCore;
 using System.Text;
@@ -115,6 +117,25 @@ builder.Services.AddAuthentication(options =>
 builder.Services.AddAuthorization();
 
 var app = builder.Build();
+
+// Create a get endpoint test
+app.MapPost("/api/v2/auth/register", HanldeAsync);
+
+async Task<IResult> HanldeAsync(
+    User user,
+    HttpContext context,
+    IAuthService authService
+)
+{
+    var result = await authService.Register(user.Email, user.Password);
+
+    if (!result)
+    {
+        return Results.BadRequest("Usuario no se ha podido crear");
+    }
+
+    return Results.Ok("Usuario registrado");
+}
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
