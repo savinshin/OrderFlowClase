@@ -23,6 +23,7 @@ builder.Configuration.AddUserSecrets(typeof(Program).Assembly, true);
 
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IRoleService, RoleService>();
 
 builder.AddServiceDefaults();
 
@@ -148,11 +149,15 @@ if (app.Environment.IsDevelopment())
         options.SwaggerEndpoint("/openapi/v1.json", "v1");
     });
 
-        using var scope = app.Services.CreateScope();
+    using var scope = app.Services.CreateScope();
 
-        // Run migrations
-        var context = scope.ServiceProvider.GetRequiredService<MyAppContext>();
-        await context.Database.MigrateAsync();
+    // Run migrations
+    var context = scope.ServiceProvider.GetRequiredService<MyAppContext>();
+    await context.Database.MigrateAsync();
+
+    // Seed default roles
+    var roleService = scope.ServiceProvider.GetRequiredService<IRoleService>();
+    await roleService.EnsureRolesCreatedAsync("Admin", "Customer");
 }
 
 app.UseHttpsRedirection();
@@ -163,3 +168,6 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+// Make Program accessible for integration tests
+public partial class Program { }
