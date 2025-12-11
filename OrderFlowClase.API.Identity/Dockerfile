@@ -12,6 +12,7 @@ EXPOSE 8081
 FROM mcr.microsoft.com/dotnet/sdk:10.0-preview AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
+COPY ["Directory.Packages.props", "."]
 COPY ["OrderFlowClase.API.Identity/OrderFlowClase.API.Identity.csproj", "OrderFlowClase.API.Identity/"]
 COPY ["OrderFlowClase.ServiceDefaults/OrderFlowClase.ServiceDefaults.csproj", "OrderFlowClase.ServiceDefaults/"]
 COPY ["OrderFlowClase.Shared/OrderFlowClase.Shared.csproj", "OrderFlowClase.Shared/"]
