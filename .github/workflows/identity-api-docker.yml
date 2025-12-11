@@ -10,6 +10,8 @@ on:
       - 'OrderFlowClase.ServiceDefaults/**'
       - 'OrderFlowClase.Shared/**'
       - '.github/workflows/identity-api-docker.yml'
+      - 'docker-compose.integration.yml'
+      - 'postman/**'
   pull_request:
     branches:
       - master
@@ -18,6 +20,7 @@ on:
       - 'OrderFlowClase.API.Identity/**'
       - 'OrderFlowClase.ServiceDefaults/**'
       - 'OrderFlowClase.Shared/**'
+      - 'postman/**'
   workflow_dispatch:
 
 env:
@@ -25,7 +28,7 @@ env:
   IMAGE_NAME: ${{ github.repository_owner }}/orderflow-identity-api
 
 jobs:
-  build-and-push:
+  build:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -38,8 +41,128 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./OrderFlowClase.API.Identity/Dockerfile
+          push: false
+          load: true
+          tags: identity-api:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Save Docker image
+        run: docker save identity-api:test -o /tmp/identity-api-image.tar
+
+      - name: Upload Docker image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: identity-api-image
+          path: /tmp/identity-api-image.tar
+          retention-days: 1
+
+  integration-tests:
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download Docker image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: identity-api-image
+          path: /tmp
+
+      - name: Load Docker image
+        run: docker load -i /tmp/identity-api-image.tar
+
+      - name: Start services with Docker Compose
+        env:
+          IDENTITY_API_IMAGE: identity-api:test
+        run: |
+          docker-compose -f docker-compose.integration.yml up -d
+          echo "Waiting for services to start..."
+
+      - name: Wait for PostgreSQL to be healthy
+        run: |
+          echo "Waiting for PostgreSQL..."
+          timeout 60 bash -c 'until docker exec identity-postgres pg_isready -U postgres -d identity; do sleep 2; done'
+          echo "PostgreSQL is ready!"
+
+      - name: Wait for RabbitMQ to be healthy
+        run: |
+          echo "Waiting for RabbitMQ..."
+          timeout 60 bash -c 'until docker exec identity-rabbitmq rabbitmq-diagnostics -q ping; do sleep 2; done'
+          echo "RabbitMQ is ready!"
+
+      - name: Wait for Identity API to be healthy
+        run: |
+          echo "Waiting for Identity API..."
+          timeout 120 bash -c 'until curl -sf http://localhost:8080/health; do sleep 5; done'
+          echo "Identity API is ready!"
+
+      - name: Debug - Show container logs if health check fails
+        if: failure()
+        run: |
+          echo "=== PostgreSQL logs ==="
+          docker logs identity-postgres
+          echo "=== RabbitMQ logs ==="
+          docker logs identity-rabbitmq
+          echo "=== Identity API logs ==="
+          docker logs identity-api
+
+      - name: Install Newman
+        run: npm install -g newman newman-reporter-htmlextra
+
+      - name: Run integration tests with Newman
+        run: |
+          newman run postman/Identity_API_Integration_Tests.postman_collection.json \
+            --environment postman/Identity_API_CI.postman_environment.json \
+            --reporters cli,htmlextra \
+            --reporter-htmlextra-export newman-report.html \
+            --bail
+
+      - name: Upload Newman test report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: newman-report
+          path: newman-report.html
+          retention-days: 30
+
+      - name: Show container logs on failure
+        if: failure()
+        run: |
+          echo "=== Identity API logs ==="
+          docker logs identity-api
+          echo "=== PostgreSQL logs ==="
+          docker logs identity-postgres
+          echo "=== RabbitMQ logs ==="
+          docker logs identity-rabbitmq
+
+      - name: Cleanup containers
+        if: always()
+        run: docker-compose -f docker-compose.integration.yml down -v --remove-orphans
+
+  push:
+    runs-on: ubuntu-latest
+    needs: [build, integration-tests]
+    if: github.event_name != 'pull_request'
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Log in to Container Registry
-        if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
@@ -53,7 +176,6 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=ref,event=branch
-            type=ref,event=pr
             type=sha,prefix=
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main' }}
 
@@ -62,7 +184,7 @@ jobs:
         with:
           context: .
           file: ./OrderFlowClase.API.Identity/Dockerfile
-          push: ${{ github.event_name != 'pull_request' }}
+          push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
