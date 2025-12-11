@@ -54,8 +54,8 @@
 									"});",
 									"",
 									"pm.test('Response indicates success', function () {",
-									"    const responseBody = pm.response.text();",
-									"    pm.expect(responseBody.toLowerCase()).to.include('true');",
+									"    const responseBody = pm.response.text().toLowerCase();",
+									"    pm.expect(responseBody).to.include('success');",
 									"});",
 									"",
 									"// Store the email for subsequent tests",
@@ -849,8 +849,8 @@
 									"});",
 									"",
 									"pm.test('Response indicates success', function () {",
-									"    const responseBody = pm.response.text();",
-									"    pm.expect(responseBody.toLowerCase()).to.include('true');",
+									"    const responseBody = pm.response.text().toLowerCase();",
+									"    pm.expect(responseBody).to.include('registrado');",
 									"});"
 								],
 								"type": "text/javascript"
