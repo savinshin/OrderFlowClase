@@ -83,7 +83,7 @@ jobs:
         env:
           IDENTITY_API_IMAGE: identity-api:test
         run: |
-          docker-compose -f docker-compose.integration.yml up -d
+          docker compose -f docker-compose.integration.yml up -d
           echo "Waiting for services to start..."
 
       - name: Wait for PostgreSQL to be healthy
@@ -145,7 +145,7 @@ jobs:
 
       - name: Cleanup containers
         if: always()
-        run: docker-compose -f docker-compose.integration.yml down -v --remove-orphans
+        run: docker compose -f docker-compose.integration.yml down -v --remove-orphans
 
   push:
     runs-on: ubuntu-latest
